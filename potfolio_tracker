@@ -1,6 +1,7 @@
 import requests
 from prettytable import PrettyTable
 
+
 API_KEY = '7gxIXsUQGzNUBiQU2zcruvNjexlg2jum'
 BASE_URL = 'https://www.alphavantage.co/query'
 
@@ -22,36 +23,74 @@ def get_stock_price(symbol):
     except KeyError:
         return None
 
-def add_stock(symbol, quantity):
-    if quantity <= 0:
-        print(f"Error: Cannot add a non-positive quantity ({quantity}) of {symbol}.")
-        return
-
-    price = get_stock_price(symbol)
-    if price is None:
-        print(f"Error: Invalid stock symbol '{symbol}' or API limit reached.")
-        return
-    
-    for stock in portfolio:
-        if stock['symbol'] == symbol:
-            stock['quantity'] += quantity
-            stock['initial_price'] = ((stock['initial_price'] * stock['quantity']) + (price * quantity)) / (stock['quantity'] + quantity)
-            stock['initial_total_value'] = stock['quantity'] * stock['initial_price']
-            stock['price'] = price
-            stock['total_value'] = stock['quantity'] * price
-            print(f"Added {quantity} more shares of {symbol} at ${price:.2f} each.")
-            return
-    
-    stock = {
-        'symbol': symbol,
-        'quantity': quantity,
-        'initial_price': price,
-        'initial_total_value': quantity * price,
-        'price': price,
-        'total_value': quantity * price
+def search_stock_symbol(keyword):
+    params = {
+        'function': 'SYMBOL_SEARCH',
+        'keywords': keyword,
+        'apikey': API_KEY
     }
-    portfolio.append(stock)
-    print(f"Added {quantity} shares of {symbol} at ${price:.2f} each.")
+    response = requests.get(BASE_URL, params=params)
+    data = response.json()
+    
+    if 'bestMatches' in data:
+        matches = data['bestMatches']
+        return matches
+    else:
+        return None
+
+def add_stock():
+    while True:
+        keyword = input("Enter stock symbol or keyword to search: ").upper()
+        matches = search_stock_symbol(keyword)
+        if not matches:
+            print(f"Error: No matches found for '{keyword}'. Please enter a valid stock symbol or keyword.")
+            continue
+
+        print("Matching symbols found:")
+        for match in matches:
+            print(f"Symbol: {match['1. symbol']}, Name: {match['2. name']}")
+        
+        symbol = input("Enter the exact stock symbol from the list above: ").upper()
+        if not any(match['1. symbol'] == symbol for match in matches):
+            print(f"Error: Invalid stock symbol '{symbol}'. Please enter a valid stock symbol from the list above.")
+            continue
+
+        while True:
+            try:
+                quantity = int(input("Enter quantity: "))
+                if quantity <= 0:
+                    print(f"Error: Cannot add a non-positive quantity ({quantity}) of {symbol}.")
+                else:
+                    break
+            except ValueError:
+                print("Error: Quantity must be a positive integer. Please try again.")
+
+        price = get_stock_price(symbol)
+        if price is None:
+            print(f"Error: Invalid stock symbol '{symbol}' or API limit reached.")
+            continue
+
+        for stock in portfolio:
+            if stock['symbol'] == symbol:
+                stock['quantity'] += quantity
+                stock['initial_price'] = ((stock['initial_price'] * stock['quantity']) + (price * quantity)) / (stock['quantity'] + quantity)
+                stock['initial_total_value'] = stock['quantity'] * stock['initial_price']
+                stock['price'] = price
+                stock['total_value'] = stock['quantity'] * price
+                print(f"Added {quantity} more shares of {symbol} at ${price:.2f} each.")
+                return
+        
+        stock = {
+            'symbol': symbol,
+            'quantity': quantity,
+            'initial_price': price,
+            'initial_total_value': quantity * price,
+            'price': price,
+            'total_value': quantity * price
+        }
+        portfolio.append(stock)
+        print(f"Added {quantity} shares of {symbol} at ${price:.2f} each.")
+        return
 
 def remove_stock(symbol, quantity):
     if quantity <= 0:
@@ -114,9 +153,7 @@ def main():
         choice = input("Choose an option: ")
         
         if choice == '1':
-            symbol = input("Enter stock symbol: ").upper()
-            quantity = int(input("Enter quantity: "))
-            add_stock(symbol, quantity)
+            add_stock()
         elif choice == '2':
             symbol = input("Enter stock symbol to remove: ").upper()
             quantity = int(input("Enter quantity to remove: "))
